@@ -109,8 +109,21 @@ def delete_batches(email_batches, list_id, api_key)
     end
 
     puts "\e[36m [#{res.code}]\e[0m" 
-    fail(res) if res.code != 200
-    sleep 3 if i < (email_batches.length - 1)
+
+    # Attempt to handle rate limiting responses from Klaviyo. Their docs don't spell
+    # things out, so hopefully they're following standards.
+    # https://www.klaviyo.com/docs/api/v2/lists
+    # https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+    if res.code == 429
+      retry_delay = res.headers['Retry-After'] || 5
+      puts
+      puts "Klaviyo rate limit reached. Waiting for #{retry_delay} seconds before trying again."
+      puts
+      sleep retry_delay
+      redo
+    elsif res.code != 200
+      fail(res)
+    end
   end
 end
 
